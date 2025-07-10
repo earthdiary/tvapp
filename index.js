@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(require('cors')()); // Cho phép mọi domain gọi
 app.use(express.json());
+app.use(express.static('public'))
 
 // Route proxy tới ophim1
 app.get('/api/phim', async (req, res) => {
