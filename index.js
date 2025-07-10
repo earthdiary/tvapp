@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const fs = require('fs');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,7 @@ app.get('/api/phim', async (req, res) => {
 
   try {
     const response = await axios.get(targetUrl);
+    fs.writeFileSync('./public/'+country+'.json', JSON.stringify(response.data), 'utf8');
     res.json(response.data); // Trả về JSON sạch
   } catch (error) {
     res.status(500).json({ error: 'Lỗi khi gọi ophim API' });
@@ -25,6 +27,7 @@ app.get('/api/phim/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     const result = await axios.get(`https://ophim1.com/phim/${slug}`);
+    fs.writeFileSync('./public/'+slug+'.json', JSON.stringify(result.data), 'utf8');
     res.json(result.data);
   } catch (err) {
     res.status(500).json({ error: 'Không lấy được thông tin phim' });
