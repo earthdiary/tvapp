@@ -1,40 +1,50 @@
 const express = require('express');
 const axios = require('axios');
-const fs = require('fs');
-const app = express();
+const sharp = require('sharp');
+const pLimit = require('p-limit');
 
+const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(require('cors')()); // Cho phép mọi domain gọi
-app.use(express.json());
-app.use(express.static('public'))
+const limit = pLimit(3); // Chỉ cho phép 3 ảnh xử lý đồng thời
 
-// Route proxy tới ophim1
-app.get('/api/phim', async (req, res) => {
-  const { page = 1, country = 'trung-quoc' } = req.query;
-  const targetUrl = `https://ophim1.com/v1/api/danh-sach/quoc-gia?page=${page}&slug=${country}`;
+app.get('/image', async (req, res) => {
+  const { url, width = 200 } = req.query;
+  if (!url) return res.status(400).send('Thiếu URL ảnh');
 
-  try {
-    const response = await axios.get(targetUrl);
-    fs.writeFileSync('./public/'+country+'.json', JSON.stringify(response.data), 'utf8');
-    res.json(response.data); // Trả về JSON sạch
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi khi gọi ophim API' });
-  }
-});
+  limit(async () => {
+    try {
+      const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'arraybuffer',
+        timeout: 10000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
 
-// Ví dụ route lấy chi tiết phim
-app.get('/api/phim/:slug', async (req, res) => {
-  const { slug } = req.params;
-  try {
-    const result = await axios.get(`https://ophim1.com/phim/${slug}`);
-    fs.writeFileSync('./public/'+slug+'.json', JSON.stringify(result.data), 'utf8');
-    res.json(result.data);
-  } catch (err) {
-    res.status(500).json({ error: 'Không lấy được thông tin phim' });
-  }
-});
+      const contentType = response.headers['content-type'];
 
-app.listen(PORT, () => {
-  console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
+      if (!contentType || !contentType.startsWith('image')) {
+        throw new Error('Không phải file ảnh');
+      }
+
+      let outputBuffer;
+      try {
+        outputBuffer = await sharp(response.data)
+          .resize({ width: parseInt(width) })
+          .jpeg({ quality: 70 })
+          .toBuffer();
+      } catch (err) {
+        console.warn('⚠️ Không resize được ảnh, trả gốc');
+        outputBuffer = response.data;
+      }
+
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.send(outputBuffer);
+
+    } catch (err) {
+      console.error("Lỗi tải ảnh:", err.message);
+      res.status(500).send('Lỗi xử lý ảnh');
+    }
+  });
 });
