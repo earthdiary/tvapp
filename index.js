@@ -48,3 +48,7 @@ app.get('/image', async (req, res) => {
     }
   });
 });
+
+app.listen(PORT, () => {
+  console.log(`✅ Server ảnh đang chạy tại http://localhost:${PORT}`);
+});
